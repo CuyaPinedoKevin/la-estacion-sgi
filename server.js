@@ -8,7 +8,6 @@ const PORT = process.env.PORT || 3000;
 
 app.use(express.json());
 
-// CORS headers
 app.use((req, res, next) => {
   res.header("Access-Control-Allow-Origin", "*");
   res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
@@ -19,12 +18,8 @@ app.use((req, res, next) => {
   next();
 });
 
-
 app.use(express.static(__dirname));
 
-
-
-// Login
 app.post("/api/auth/login", async (req, res) => {
   const { correo, password } = req.body;
   if (!correo || !password) {
@@ -62,7 +57,6 @@ app.post("/api/auth/login", async (req, res) => {
   }
 });
 
-
 app.post("/api/auth/registrar", async (req, res) => {
   const { nombre, correo, password, tipo, id_sede } = req.body;
   if (!nombre || !correo || !password || !tipo || !id_sede) {
@@ -86,7 +80,6 @@ app.post("/api/auth/registrar", async (req, res) => {
   }
 });
 
-// Listar usuarios (para administrador)
 app.get("/api/auth/usuarios", async (req, res) => {
   try {
     const result = await db.ejecutarQuery("SELECT id_usuario, nombre, correo, tipo, id_sede FROM usuarios");
@@ -97,7 +90,6 @@ app.get("/api/auth/usuarios", async (req, res) => {
 });
 
 
-// Listar Recursos
 app.get("/api/recursos", async (req, res) => {
   try {
     const result = await db.ejecutarQuery("SELECT * FROM recursos ORDER BY id_recurso ASC");
@@ -107,7 +99,6 @@ app.get("/api/recursos", async (req, res) => {
   }
 });
 
-// Listar Productos Comerciales
 app.get("/api/productos", async (req, res) => {
   try {
     const result = await db.ejecutarQuery("SELECT * FROM productos ORDER BY id_producto ASC");
@@ -116,7 +107,6 @@ app.get("/api/productos", async (req, res) => {
     res.status(500).json({ mensaje: "Error al obtener productos", error: error.message });
   }
 });
-
 
 app.get("/api/recetas", async (req, res) => {
   try {
@@ -131,9 +121,6 @@ app.get("/api/recetas", async (req, res) => {
     res.status(500).json({ mensaje: "Error al obtener recetas", error: error.message });
   }
 });
-
-
-
 
 app.get("/api/compras", async (req, res) => {
   try {
@@ -155,7 +142,6 @@ app.get("/api/compras", async (req, res) => {
     res.status(500).json({ mensaje: "Error al obtener compras", error: error.message });
   }
 });
-
 
 app.post("/api/compras", async (req, res) => {
   const { proveedor, total, detalles } = req.body;
@@ -184,7 +170,6 @@ app.post("/api/compras", async (req, res) => {
   }
 });
 
-// Confirmar Recepción de Compra
 app.post("/api/compras/:id/confirmar", async (req, res) => {
   const { id } = req.params;
   const { id_usuario, sede_id } = req.body; // Para auditoría y Kardex
@@ -211,19 +196,16 @@ app.post("/api/compras/:id/confirmar", async (req, res) => {
       const stockAnterior = recurso.stock_actual;
       const stockNuevo = stockAnterior + det.cantidad;
 
-      // Actualizar stock del recurso
       await db.ejecutarQuery(
         "UPDATE recursos SET stock_actual = ?, precio_compra = ? WHERE id_recurso = ?",
         [stockNuevo, det.precio_unitario, det.recurso_id]
       );
 
-      // Agregar movimiento a Kardex
       await db.ejecutarQuery(
         "INSERT INTO kardex (recurso_id, tipo_movimiento, cantidad, saldo_anterior, saldo_nuevo, documento_origen, id_usuario, sede_id) VALUES (?, 'Compra', ?, ?, ?, ?, ?, ?)",
         [det.recurso_id, det.cantidad, stockAnterior, stockNuevo, `COMP-${id}`, id_usuario || null, sede_id || "Sede Norte"]
       );
 
-      // Crear Lote si tiene fecha de vencimiento
       if (det.fecha_vencimiento) {
         await db.ejecutarQuery(
           "INSERT INTO lotes (recurso_id, cantidad, fecha_vencimiento, codigo_lote) VALUES (?, ?, ?, ?)",
@@ -231,7 +213,6 @@ app.post("/api/compras/:id/confirmar", async (req, res) => {
         );
       }
 
-      // Resolver posibles alertas de stock agotado/mínimo
       if (stockNuevo > stockAnterior) {
         await db.ejecutarQuery(
           "UPDATE alertas SET estado = 'Resuelta' WHERE recurso_id = ? AND estado = 'Pendiente'",
@@ -240,10 +221,8 @@ app.post("/api/compras/:id/confirmar", async (req, res) => {
       }
     }
 
-    // 3. Cambiar estado de la compra
     await db.ejecutarQuery("UPDATE compras SET estado = 'Confirmado' WHERE id_compra = ?", [id]);
 
-    // 4. Auditoría en MongoDB
     await db.registrarAuditoria({
       id_usuario: id_usuario?.toString(),
       rol: "Almacenero",
@@ -258,7 +237,6 @@ app.post("/api/compras/:id/confirmar", async (req, res) => {
   }
 });
 
-// Anular Compra (Rollback)
 app.post("/api/compras/:id/anular", async (req, res) => {
   const { id } = req.params;
   const { id_usuario, sede_id } = req.body;
@@ -282,19 +260,15 @@ app.post("/api/compras/:id/anular", async (req, res) => {
       const stockAnterior = recurso.stock_actual;
       const stockNuevo = Math.max(0, stockAnterior - det.cantidad);
 
-      // Actualizar stock del recurso
       await db.ejecutarQuery("UPDATE recursos SET stock_actual = ? WHERE id_recurso = ?", [stockNuevo, det.recurso_id]);
 
-      // Agregar Kardex de Rollback
       await db.ejecutarQuery(
         "INSERT INTO kardex (recurso_id, tipo_movimiento, cantidad, saldo_anterior, saldo_nuevo, documento_origen, id_usuario, sede_id) VALUES (?, 'Rollback', ?, ?, ?, ?, ?, ?)",
         [det.recurso_id, -det.cantidad, stockAnterior, stockNuevo, `RBK-COMP-${id}`, id_usuario || null, sede_id || "Sede Norte"]
       );
 
-      // Eliminar Lote asociado
       await db.ejecutarQuery("DELETE FROM lotes WHERE recurso_id = ? AND codigo_lote = ?", [det.recurso_id, `LOTE-COMP-${id}`]);
 
-      // Revisar si cae en stock crítico y generar alertas
       if (stockNuevo <= 0) {
         await db.ejecutarQuery(
           "INSERT INTO alertas (tipo_alerta, recurso_id, mensaje, estado, prioridad) VALUES ('stock_agotado', ?, ?, 'Pendiente', 'Alta')",
@@ -310,7 +284,6 @@ app.post("/api/compras/:id/anular", async (req, res) => {
 
     await db.ejecutarQuery("UPDATE compras SET estado = 'Anulado' WHERE id_compra = ?", [id]);
 
-    // Auditoría MongoDB
     await db.registrarAuditoria({
       id_usuario: id_usuario?.toString(),
       rol: "Almacenero",
@@ -325,11 +298,6 @@ app.post("/api/compras/:id/anular", async (req, res) => {
   }
 });
 
-// ==========================================
-// 4. MÓDULO DE PEDIDOS DELIVERY (CAJERO / CLIENTE)
-// ==========================================
-
-// Listar Pedidos
 app.get("/api/pedidos", async (req, res) => {
   try {
     const pedidosRes = await db.ejecutarQuery("SELECT * FROM pedidos ORDER BY id_pedido DESC");
@@ -351,7 +319,6 @@ app.get("/api/pedidos", async (req, res) => {
   }
 });
 
-// Registrar Pedido (Delivery)
 app.post("/api/pedidos", async (req, res) => {
   const { cliente, direccion, telefono, total, sede_id, tipo_pago, detalles } = req.body;
   if (!cliente || !direccion || !telefono || !detalles || detalles.length === 0) {
@@ -378,13 +345,11 @@ app.post("/api/pedidos", async (req, res) => {
   }
 });
 
-// Preparar Pedido (Paso clave: DESCUENTO DE INVENTARIO POR RECETA)
 app.post("/api/pedidos/:id/preparar", async (req, res) => {
   const { id } = req.params;
   const { id_usuario, sede_id } = req.body;
 
   try {
-    // 1. Obtener pedido
     const pedidoRes = await db.ejecutarQuery("SELECT * FROM pedidos WHERE id_pedido = ?", [id]);
     if (pedidoRes.rowCount === 0) {
       return res.status(404).json({ mensaje: "Pedido no encontrado" });
@@ -394,11 +359,9 @@ app.post("/api/pedidos/:id/preparar", async (req, res) => {
       return res.status(400).json({ mensaje: "El pedido ya está en preparación o fue despachado/cancelado" });
     }
 
-    // 2. Obtener detalles del pedido
     const detallesRes = await db.ejecutarQuery("SELECT * FROM pedidos_detalles WHERE pedido_id = ?", [id]);
     const detalles = detallesRes.rows;
 
-    // Calcular insumos a descontar
     const insumosADescontar = {}; // id_recurso -> cantidad_total
 
     for (const det of detalles) {
@@ -409,7 +372,6 @@ app.post("/api/pedidos/:id/preparar", async (req, res) => {
         const recId = producto.recurso_directo_id;
         insumosADescontar[recId] = (insumosADescontar[recId] || 0) + det.cantidad;
       } else {
-        // Preparado: buscar ingredientes de la receta
         const recetaRes = await db.ejecutarQuery("SELECT recurso_id, cantidad_necesaria FROM recetas WHERE producto_id = ?", [det.producto_id]);
         const ingredientes = recetaRes.rows;
 
@@ -420,7 +382,6 @@ app.post("/api/pedidos/:id/preparar", async (req, res) => {
       }
     }
 
-    // 3. Validar disponibilidad de stock antes de proceder
     for (const recId in insumosADescontar) {
       const recursoRes = await db.ejecutarQuery("SELECT stock_actual, nombre FROM recursos WHERE id_recurso = ?", [recId]);
       const recurso = recursoRes.rows[0];
@@ -431,7 +392,6 @@ app.post("/api/pedidos/:id/preparar", async (req, res) => {
       }
     }
 
-    // 4. Descontar stock e insertar en Kardex
     for (const recId in insumosADescontar) {
       const descuento = insumosADescontar[recId];
       const recursoRes = await db.ejecutarQuery("SELECT stock_actual, stock_minimo, nombre FROM recursos WHERE id_recurso = ?", [recId]);
@@ -439,16 +399,13 @@ app.post("/api/pedidos/:id/preparar", async (req, res) => {
       const stockAnterior = recurso.stock_actual;
       const stockNuevo = stockAnterior - descuento;
 
-      // Actualizar recurso
       await db.ejecutarQuery("UPDATE recursos SET stock_actual = ? WHERE id_recurso = ?", [stockNuevo, recId]);
 
-      // Kardex movimiento
       await db.ejecutarQuery(
         "INSERT INTO kardex (recurso_id, tipo_movimiento, cantidad, saldo_anterior, saldo_nuevo, documento_origen, id_usuario, sede_id) VALUES (?, 'Pedido', ?, ?, ?, ?, ?, ?)",
         [recId, -descuento, stockAnterior, stockNuevo, `PED-${id}`, id_usuario || null, sede_id || pedido.sede_id]
       );
 
-      // Alertas de stock crítico
       if (stockNuevo <= 0) {
         await db.ejecutarQuery(
           "INSERT INTO alertas (tipo_alerta, recurso_id, mensaje, estado, prioridad) VALUES ('stock_agotado', ?, ?, 'Pendiente', 'Alta')",
@@ -462,10 +419,8 @@ app.post("/api/pedidos/:id/preparar", async (req, res) => {
       }
     }
 
-    // 5. Actualizar estado del pedido
     await db.ejecutarQuery("UPDATE pedidos SET estado = 'En preparación' WHERE id_pedido = ?", [id]);
 
-    // 6. Auditoría en MongoDB
     await db.registrarAuditoria({
       id_usuario: id_usuario?.toString(),
       rol: "Cajero",
@@ -480,7 +435,6 @@ app.post("/api/pedidos/:id/preparar", async (req, res) => {
   }
 });
 
-// Cancelar Pedido
 app.post("/api/pedidos/:id/cancelar", async (req, res) => {
   const { id } = req.params;
   const { id_usuario, sede_id } = req.body;
@@ -496,7 +450,6 @@ app.post("/api/pedidos/:id/cancelar", async (req, res) => {
       return res.status(400).json({ mensaje: "El pedido ya fue entregado o cancelado previamente" });
     }
 
-    // Regla de Negocio: Si ya estaba en preparación o más adelante, se registra como MERMA
     const estabaEnPreparacion = ["En preparación", "Listo para despacho", "En camino"].includes(pedido.estado);
 
     if (estabaEnPreparacion) {
@@ -509,10 +462,8 @@ app.post("/api/pedidos/:id/cancelar", async (req, res) => {
         detalle: { pedido_id: id, cliente: pedido.cliente, total: pedido.total, nota: "Pedido cancelado después de preparación. Pérdida completa de ingredientes." }
       });
 
-      // Insertar ajuste en Kardex como 'Merma'
       const detallesRes = await db.ejecutarQuery("SELECT * FROM pedidos_detalles WHERE pedido_id = ?", [id]);
       for (const det of detallesRes.rows) {
-        // Registrar en Kardex el evento de Merma para trazar las pérdidas de alimentos
         await db.ejecutarQuery(
           "INSERT INTO kardex (recurso_id, tipo_movimiento, cantidad, saldo_anterior, saldo_nuevo, documento_origen, id_usuario, sede_id) " +
           "SELECT recurso_id, 'Merma', 0, stock_actual, stock_actual, ?, ?, ? FROM recetas WHERE producto_id = ?",
@@ -533,7 +484,6 @@ app.post("/api/pedidos/:id/cancelar", async (req, res) => {
   }
 });
 
-// Cambiar otros estados del Pedido
 app.post("/api/pedidos/:id/cambiar-estado", async (req, res) => {
   const { id } = req.params;
   const { estado, id_usuario, sede_id } = req.body; // 'Confirmado', 'Listo para despacho', 'En camino', 'Entregado', 'Rechazado'
@@ -548,7 +498,6 @@ app.post("/api/pedidos/:id/cambiar-estado", async (req, res) => {
       return res.status(404).json({ mensaje: "Pedido no encontrado" });
     }
 
-    // Auditoría en MongoDB
     await db.registrarAuditoria({
       id_usuario: id_usuario?.toString(),
       rol: "Cajero",
@@ -563,11 +512,6 @@ app.post("/api/pedidos/:id/cambiar-estado", async (req, res) => {
   }
 });
 
-// ==========================================
-// 5. KARDEX, ALERTAS E INDICADORES (DASHBOARD)
-// ==========================================
-
-// Obtener Kardex completo
 app.get("/api/kardex", async (req, res) => {
   try {
     const result = await db.ejecutarQuery(`
@@ -583,7 +527,6 @@ app.get("/api/kardex", async (req, res) => {
   }
 });
 
-// Obtener Alertas activas
 app.get("/api/alertas", async (req, res) => {
   try {
     const result = await db.ejecutarQuery(`
@@ -599,7 +542,6 @@ app.get("/api/alertas", async (req, res) => {
   }
 });
 
-// Resolver Alerta
 app.post("/api/alertas/:id/resolver", async (req, res) => {
   const { id } = req.params;
   try {
@@ -610,7 +552,6 @@ app.post("/api/alertas/:id/resolver", async (req, res) => {
   }
 });
 
-// Estadísticas del Dashboard por Rol
 app.get("/api/dashboard/stats", async (req, res) => {
   const { sede } = req.query; // Para filtrar por sede si aplica
 
@@ -635,9 +576,6 @@ app.get("/api/dashboard/stats", async (req, res) => {
   }
 });
 
-// ==========================================
-// 6. TRABAJO DE SINCRONIZACIÓN SQLITE (OFFLINE)
-// ==========================================
 app.post("/api/sync", async (req, res) => {
   const { operaciones } = req.body;
   if (!operaciones || !Array.isArray(operaciones)) {
@@ -665,7 +603,6 @@ app.post("/api/sync", async (req, res) => {
           );
         }
 
-        // Registrar auditoría del pedido offline sincronizado
         await db.registrarAuditoria({
           id_usuario: id_usuario?.toString() || "Offline",
           rol: "Cajero",
@@ -686,7 +623,6 @@ app.post("/api/sync", async (req, res) => {
   res.json({ mensaje: "Proceso de sincronización completado", resultados });
 });
 
-// Obtener logs de auditoría (para administrador - MongoDB)
 app.get("/api/logs", async (req, res) => {
   try {
     if (db.isMongoMock) {
@@ -708,7 +644,6 @@ app.get("/api/logs", async (req, res) => {
   }
 });
 
-// Servir la app
 app.listen(PORT, () => {
   console.log(`Servidor de La Estación SGI corriendo en: http://localhost:${PORT}`);
 });
