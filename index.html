@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>La Estación - SGI Inicio</title>
+  <link rel="stylesheet" href="css/general.css">
+</head>
+<body>
+  <header>
+  </header>
+
+  <main class="grid-dos">
+    <section class="tarjeta tarjeta-principal">
+      <span class="etiqueta">Proyecto de Programación Web</span>
+      <h2>Sistema de Gestión de Inventarios (SGI) - La Estación</h2>
+      <p>Bienvenido al SGI desarrollado para el restaurante delivery de comida rápida <strong>"La Estación"</strong>. Esta plataforma centraliza el control de stock, proveedores, recetas, Kardex de almacén, compras y simulación de delivery en tiempo real.</p>
+      
+      <div class="acciones" style="margin-top: 20px;">
+        <a class="boton" href="login.html">Iniciar Sesión</a>
+        <a class="boton secundario" href="registrar.html">Registrarse</a>
+      </div>
+    </section>
+
+    <section class="tarjeta nota">
+      <h3>Tecnologías y 3 Motores de BD</h3>
+      <p style="margin-bottom: 12px;">Para garantizar alta disponibilidad y trazabilidad, el SGI integra:</p>
+      <ul style="list-style-position: inside; color: var(--text-secondary); display: grid; gap: 8px;">
+        <li><strong>PostgreSQL:</strong> Gestión transaccional sólida (usuarios, catálogo, compras, lotes, Kardex y pedidos).</li>
+        <li><strong>MongoDB:</strong> Auditoría detallada (logs de estado, registros de inicio de sesión y cierres diarios).</li>
+        <li><strong>SQLite:</strong> Base embebida local que permite continuar registrando pedidos sin conexión a internet y sincronizarlos después.</li>
+      </ul>
+    </section>
+
+    <section class="tarjeta ancho-completo">
+      <h2>Módulos del Sistema</h2>
+      <div class="grid-tres" style="margin-top: 15px;">
+        <div style="background: rgba(255,255,255,0.02); padding: 15px; border-radius: 10px; border: 1px solid var(--border);">
+          <h4 style="color: var(--accent); margin-bottom: 5px;">📦 Control de Stock por Recetas</h4>
+          <p style="font-size: 0.9rem;">El stock de ingredientes disminuye de forma automática según la receta al pasar los pedidos a preparación.</p>
+        </div>
+        <div style="background: rgba(255,255,255,0.02); padding: 15px; border-radius: 10px; border: 1px solid var(--border);">
+          <h4 style="color: var(--primary); margin-bottom: 5px;">🛒 Abastecimiento por Lotes</h4>
+          <p style="font-size: 0.9rem;">Gestión de compras en estado Borrador, Recepción Total, control de fechas de vencimiento y rollback de compras.</p>
+        </div>
+        <div style="background: rgba(255,255,255,0.02); padding: 15px; border-radius: 10px; border: 1px solid var(--border);">
+          <h4 style="color: var(--info); margin-bottom: 5px;">📋 Kardex y Auditoría Completa</h4>
+          <p style="font-size: 0.9rem;">Trazabilidad absoluta de entradas, salidas y mermas vinculadas directamente a su documento de origen.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+  </footer>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
