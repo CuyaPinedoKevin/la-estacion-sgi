@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>La Estación - Registrar Usuario</title>
+  <link rel="stylesheet" href="css/general.css">
+</head>
+<body>
+  <header>
+    <!-- Se genera dinámicamente con js/app.js -->
+  </header>
+
+  <main style="max-width: 500px; margin: 40px auto;">
+    <section class="tarjeta">
+      <h2 style="text-align: center; margin-bottom: 20px;" id="titulo-registro">Registrar Nuevo Usuario</h2>
+      <form id="form-registrar">
+        <div class="form-group">
+          <label for="nombre">Nombre Completo</label>
+          <input type="text" id="nombre" required placeholder="Ej. Juan Pérez">
+        </div>
+        <div class="form-group">
+          <label for="correo">Correo Electrónico</label>
+          <input type="email" id="correo" required placeholder="juan@estacion.com">
+        </div>
+        <div class="form-group">
+          <label for="password">Contraseña</label>
+          <input type="password" id="password" required placeholder="••••••••">
+        </div>
+        <div class="form-group">
+          <label for="tipo">Rol / Puesto</label>
+          <select id="tipo" required>
+            <option value="Cajero">Cajero (Delivery & Ventas)</option>
+            <option value="Almacenero">Almacenero (Compras & Inventario)</option>
+            <option value="Administrador">Administrador (Métricas & Reportes)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="id_sede">Sede Asignada</label>
+          <select id="id_sede" required>
+            <option value="Sede Norte">Sede Norte</option>
+            <option value="Sede Sur">Sede Sur</option>
+          </select>
+        </div>
+        
+        <div id="mensaje-feedback" class="mensaje" style="display: none;"></div>
+        <button type="submit" style="width: 100%; margin-top: 10px;">Crear Cuenta</button>
+      </form>
+      
+      <p id="enlace-login-container" style="text-align: center; margin-top: 20px; font-size: 0.9rem;">
+        ¿Ya tienes una cuenta? <a href="login.html" style="color: var(--primary); text-decoration: none; font-weight: 500;">Inicia sesión aquí</a>
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    <!-- Se genera dinámicamente con js/app.js -->
+  </footer>
+
+  <script src="js/app.js"></script>
+  <script>
+   
+    const adminConectado = obtenerUsuarioSesion()?.tipo === "Administrador";
+    if (adminConectado) {
+      document.getElementById("titulo-registro").textContent = "Registrar Colaborador";
+      document.getElementById("enlace-login-container").style.display = "none";
+    }
+
+    document.getElementById("form-registrar").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const nombre = document.getElementById("nombre").value;
+      const correo = document.getElementById("correo").value;
+      const password = document.getElementById("password").value;
+      const tipo = document.getElementById("tipo").value;
+      const id_sede = document.getElementById("id_sede").value;
+      const feedbackDiv = document.getElementById("mensaje-feedback");
+      
+      feedbackDiv.style.display = "none";
+      
+      try {
+        const res = await enviarPeticion(`${API_BASE}/api/auth/registrar`, {
+          method: "POST",
+          body: JSON.stringify({ nombre, correo, password, tipo, id_sede })
+        });
+        
+        feedbackDiv.textContent = res.mensaje;
+        feedbackDiv.className = "mensaje exito";
+        feedbackDiv.style.display = "flex";
+        
+    
+        if (adminConectado) {
+          document.getElementById("form-registrar").reset();
+        } else {
+          // Redirigir a login en 2 segundos
+          setTimeout(() => {
+            window.location.href = "login.html";
+          }, 1500);
+        }
+      } catch (error) {
+        feedbackDiv.textContent = error.message;
+        feedbackDiv.className = "mensaje error";
+        feedbackDiv.style.display = "flex";
+      }
+    });
+  </script>
+</body>
+</html>

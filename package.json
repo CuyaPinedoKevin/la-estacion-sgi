@@ -1,0 +1,28 @@
+{
+  "name": "la-estacion-sgi",
+  "version": "1.0.0",
+  "description": "Sistema de Gestión de Inventarios - La Estación",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "express",
+    "postgresql",
+    "mongodb",
+    "sgi"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "mongoose": "^8.2.0",
+    "pg": "^8.11.3",
+    "sqlite3": "^5.1.7"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

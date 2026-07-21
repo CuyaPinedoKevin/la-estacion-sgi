@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>La Estación - Control de Pedidos</title>
+  <link rel="stylesheet" href="css/general.css">
+</head>
+<body>
+  <header>
+    <!-- Se genera dinámicamente -->
+  </header>
+
+  <main>
+    <section class="tarjeta ancho-completo">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+        <div>
+          <h3>Centro de Control de Pedidos Delivery</h3>
+          <p style="font-size:0.9rem;">Gestión del flujo logístico: Registrado → Confirmado → En preparación (Descuento de Insumos) → Listo → En camino → Entregado.</p>
+        </div>
+        <a href="form_pedido.html" class="boton">+ Registrar Pedido</a>
+      </div>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>Cod. Pedido</th>
+              <th>Fecha</th>
+              <th>Cliente</th>
+              <th>Dirección / Teléfono</th>
+              <th>Detalles de Compra</th>
+              <th>Pago</th>
+              <th>Sede</th>
+              <th>Total</th>
+              <th>Estado Actual</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody id="tabla-pedidos-control-body">
+            <!-- Cargado dinámicamente -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <!-- Se genera dinámicamente -->
+  </footer>
+
+  <script src="js/app.js"></script>
+  <script>
+    window.addEventListener("DOMContentLoaded", async () => {
+      const usuario = validarAcceso(["Cajero", "Administrador"]);
+      if (!usuario) return;
+
+      await cargarPedidosCompletos();
+    });
+
+    async function cargarPedidosCompletos() {
+      try {
+        const pedidos = await enviarPeticion(`${API_BASE}/api/pedidos`);
+        const tbody = document.getElementById("tabla-pedidos-control-body");
+
+        if (pedidos.length === 0) {
+          tbody.innerHTML = `<tr><td colspan="10" style="text-align:center; padding:30px;">No hay pedidos registrados en el sistema.</td></tr>`;
+          return;
+        }
+
+        tbody.innerHTML = pedidos.map(ped => {
+          let btnAcciones = "";
+          
+          if (ped.estado === "Registrado") {
+            btnAcciones = `
+              <button class="boton" onclick="avanzarEstado(${ped.id_pedido}, 'preparar')" style="min-height:32px; font-size:0.75rem; padding: 4px 10px; width:100%; margin-bottom:4px;">Preparar (Receta)</button>
+            `;
+          } else if (ped.estado === "En preparación") {
+            btnAcciones = `
+              <button class="boton" onclick="avanzarEstado(${ped.id_pedido}, 'Listo para despacho')" style="min-height:32px; font-size:0.75rem; padding: 4px 10px; background:var(--info); width:100%; margin-bottom:4px;">Listo para Despacho</button>
+            `;
+          } else if (ped.estado === "Listo para despacho") {
+            btnAcciones = `
+              <button class="boton" onclick="avanzarEstado(${ped.id_pedido}, 'En camino')" style="min-height:32px; font-size:0.75rem; padding: 4px 10px; background:var(--accent); width:100%; margin-bottom:4px;">En camino</button>
+            `;
+          } else if (ped.estado === "En camino") {
+            btnAcciones = `
+              <button class="boton" onclick="avanzarEstado(${ped.id_pedido}, 'Entregado')" style="min-height:32px; font-size:0.75rem; padding: 4px 10px; background:var(--primary); width:100%; margin-bottom:4px;">Entregado</button>
+            `;
+          }
+
+         
+          if (ped.estado !== "Entregado" && ped.estado !== "Cancelado") {
+            btnAcciones += `
+              <button class="boton danger" onclick="cancelarPedido(${ped.id_pedido})" style="min-height:32px; font-size:0.75rem; padding: 4px 10px; width:100%;">Anular / Merma</button>
+            `;
+          } else {
+            btnAcciones = `<span style="color:var(--text-secondary); font-size:0.8rem;">Sin acciones</span>`;
+          }
+
+          const detallesText = ped.detalles.map(d => `${d.cantidad}x ${d.producto_nombre}`).join("<br>");
+
+          return `
+            <tr>
+              <td><strong>#${ped.id_pedido}</strong></td>
+              <td style="font-size:0.8rem;">${new Date(ped.fecha).toLocaleString()}</td>
+              <td><strong>${ped.cliente}</strong></td>
+              <td style="font-size:0.85rem;">
+                ${ped.direccion}<br>
+                <span style="color:var(--text-secondary);">Tel: ${ped.telefono}</span>
+              </td>
+              <td style="font-size:0.85rem;">${detallesText}</td>
+              <td style="font-size:0.85rem;">${ped.tipo_pago}</td>
+              <td style="font-size:0.85rem;">${ped.sede_id}</td>
+              <td><strong style="color:var(--primary);">S/ ${parseFloat(ped.total).toFixed(2)}</strong></td>
+              <td><span class="estado ${ped.estado.replace(/ /g, '_')}">${ped.estado}</span></td>
+              <td>${btnAcciones}</td>
+            </tr>
+          `;
+        }).join("");
+
+      } catch (error) {
+        console.error("Error al obtener pedidos:", error.message);
+      }
+    }
+
+    async function avanzarEstado(id, nextState) {
+      const usuario = obtenerUsuarioSesion();
+      try {
+        if (nextState === "preparar") {
+          await enviarPeticion(`${API_BASE}/api/pedidos/${id}/preparar`, {
+            method: "POST",
+            body: JSON.stringify({ id_usuario: usuario.id_usuario, sede_id: usuario.id_sede })
+          });
+          alert("El pedido pasó a preparación. Se descontaron los insumos de stock por receta.");
+        } else {
+          await enviarPeticion(`${API_BASE}/api/pedidos/${id}/cambiar-estado`, {
+            method: "POST",
+            body: JSON.stringify({ estado: nextState, id_usuario: usuario.id_usuario, sede_id: usuario.id_sede })
+          });
+        }
+        await cargarPedidosCompletos();
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+
+    async function cancelarPedido(id) {
+      const usuario = obtenerUsuarioSesion();
+      if (!confirm("¿Deseas cancelar el pedido #" + id + "? Si ya está en preparación, se registrará una merma por pérdida de ingredientes.")) return;
+
+      try {
+        const res = await enviarPeticion(`${API_BASE}/api/pedidos/${id}/cancelar`, {
+          method: "POST",
+          body: JSON.stringify({ id_usuario: usuario.id_usuario, sede_id: usuario.id_sede })
+        });
+        alert(res.mensaje);
+        await cargarPedidosCompletos();
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+  </script>
+</body>
+</html>
